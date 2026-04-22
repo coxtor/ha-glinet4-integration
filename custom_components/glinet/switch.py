@@ -8,6 +8,13 @@ from typing import TYPE_CHECKING, Any
 
 from gli4py.error_handling import APIClientError, NonZeroResponse
 
+
+def _rpc_failed(result: Any) -> str | None:
+    """Return an error message when the router returned an RPC-level error."""
+    if isinstance(result, dict) and result.get("err_code"):
+        return f"err_code={result.get('err_code')} err_msg={result.get('err_msg')!r}"
+    return None
+
 from homeassistant.components.switch import SwitchEntity
 from homeassistant.const import EntityCategory
 from homeassistant.core import callback
@@ -293,13 +300,23 @@ class WireGuardSwitch(GliSwitchBase):
             )
         except (OSError, APIClientError, NonZeroResponse) as err:
             _LOGGER.exception("Unable to enable WG client: %s", err)
-        else:
-            _LOGGER.warning("wireguard_client_start returned: %r", result)
-            # Optimistic; next router poll will confirm. Don't refresh now:
-            # the tunnel takes a few seconds to come up and the signal would
-            # flip us back to off immediately.
-            self._attr_is_on = True
-            self.async_write_ha_state()
+            return
+        _LOGGER.warning("wireguard_client_start returned: %r", result)
+        if (rpc_err := _rpc_failed(result)) is not None:
+            _LOGGER.warning(
+                "Router rejected WG start for %s: %s. On firmware >= 4.8 "
+                "only the peer assigned to the active tunnel slot can be "
+                "started; switching peers requires an RPC that is not yet "
+                "implemented.",
+                self._client.name,
+                rpc_err,
+            )
+            return
+        # Optimistic; next router poll will confirm. Don't refresh now:
+        # the tunnel takes a few seconds to come up and the signal would
+        # flip us back to off immediately.
+        self._attr_is_on = True
+        self.async_write_ha_state()
 
     async def async_turn_off(self, **_: Any) -> None:
         """Turn off the service."""
@@ -373,11 +390,22 @@ class VpnToggleSwitch(GliSwitchBase):
         self.async_write_ha_state()
 
     def _pick_client(self) -> WireGuardClient | None:
-        """Pick a WG client to connect to.
+        """Pick a WG client to enable.
 
-        TODO: when gli4py exposes per-peer quality metrics (latency, load,
-        handshake age), prefer the best one instead of random.
+        On GL-iNet firmware >= 4.8 there is exactly one tunnel slot, so only
+        the peer currently assigned to that slot has a tunnel_id — others
+        cannot be started without first reassigning the slot via an RPC
+        gli4py does not yet expose (vpn-client.set_peer / wg-client.set_config).
+        TODO: once gli4py can switch the active peer, pick randomly (or by
+        latency/load if exposed). For now we always use the configured peer.
         """
+        active = [
+            c for c in self._router.wireguard_clients.values() if c.tunnel_id is not None
+        ]
+        if active:
+            # On 4.8+ there will be exactly one; on older firmware there is
+            # no tunnel_id, and we fall through to the random pick below.
+            return random.choice(active)
         clients = list(self._router.wireguard_clients.values())
         if not clients:
             return None
@@ -421,6 +449,11 @@ class VpnToggleSwitch(GliSwitchBase):
             )
             return
         _LOGGER.warning("wireguard_client_start returned: %r", result)
+        if (rpc_err := _rpc_failed(result)) is not None:
+            _LOGGER.warning(
+                "Router rejected VPN start for %s: %s", client.name, rpc_err
+            )
+            return
 
         # Optimistic: the WG tunnel takes a few seconds to come up; the next
         # router poll will sync via signal_vpn_update. Refreshing now would
