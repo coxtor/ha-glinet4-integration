@@ -464,6 +464,40 @@ class GLinetRouter:
         response = await self._update_platform(self._api.wireguard_client_state)
         if not response:
             return
+        _LOGGER.warning("vpn-client get_status raw response: %r", response)
+        # Build name -> tunnel_id / peer_id map from the state response so we
+        # can fill in tunnel_ids that the list call (wg-client.get_all_config_list)
+        # did not return. On firmware >= 4.8 the int we pass to
+        # wireguard_client_start is interpreted as tunnel_id by gli4py, so
+        # we MUST have a tunnel_id for every configured peer — otherwise
+        # starting a tunnel from the off state fails with "invalid parameter".
+        by_name: dict[str, dict] = {}
+        by_peer_id: dict[int, dict] = {}
+        for config in response:
+            vpn_type = config.get("type")
+            if vpn_type is not None and vpn_type != "wireguard":
+                continue
+            name = config.get("name")
+            if name:
+                by_name[name] = config
+            pid = config.get("peer_id")
+            if pid is not None:
+                by_peer_id[pid] = config
+
+        for client in self._wireguard_clients.values():
+            entry = by_peer_id.get(client.peer_id) or by_name.get(client.name)
+            if entry is None:
+                continue
+            new_tunnel_id = entry.get("tunnel_id")
+            if new_tunnel_id is not None and client.tunnel_id != new_tunnel_id:
+                _LOGGER.warning(
+                    "Resolved tunnel_id for WG client name=%s peer_id=%s: %s",
+                    client.name,
+                    client.peer_id,
+                    new_tunnel_id,
+                )
+                client.tunnel_id = new_tunnel_id
+
         # Legacy wg-client: 0 disconnected, 1 connected, 2 connecting.
         # vpn-client (4.8+): enabled + optional status; see gli4py tests.
         self._wireguard_connections = []
@@ -473,11 +507,22 @@ class GLinetRouter:
                 continue
             connected = _wireguard_status_connected(config)
 
-            peer_id = config["peer_id"]
-            client = self._wireguard_clients.get(peer_id)
+            peer_id = config.get("peer_id")
+            client = (
+                self._wireguard_clients.get(peer_id) if peer_id is not None else None
+            )
+            if client is None:
+                # Fallback: match by name for 4.8+ where peer_id may not line up
+                name = config.get("name")
+                client = next(
+                    (c for c in self._wireguard_clients.values() if c.name == name),
+                    None,
+                )
             if client is None:
                 continue
-            client.tunnel_id = config.get("tunnel_id", client.tunnel_id)
+            tid = config.get("tunnel_id")
+            if tid is not None:
+                client.tunnel_id = tid
             client.connected = connected
             if connected:
                 # If more modern firmware supports more than 1 client being connected, we need to change this

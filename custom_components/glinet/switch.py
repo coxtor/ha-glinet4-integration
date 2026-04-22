@@ -258,6 +258,12 @@ class WireGuardSwitch(GliSwitchBase):
 
     async def async_turn_on(self, **_: Any) -> None:
         """Turn on the service."""
+        if self._client.tunnel_id is None:
+            _LOGGER.warning(
+                "WG switch: tunnel_id unknown for %s, refreshing state first",
+                self._client.name,
+            )
+            await self._router.update_wireguard_client_state()
         peer_or_tunnel = self._client.tunnel_id or self._client.peer_id
         _LOGGER.warning(
             "WG switch turn_on name=%s group_id=%s peer_id=%s tunnel_id=%s (arg=%s)",
@@ -390,6 +396,12 @@ class VpnToggleSwitch(GliSwitchBase):
             _LOGGER.warning("No WireGuard clients configured, cannot start VPN")
             return
 
+        if client.tunnel_id is None:
+            _LOGGER.warning(
+                "VPN toggle: tunnel_id unknown for %s, refreshing state first",
+                client.name,
+            )
+            await self._router.update_wireguard_client_state()
         peer_or_tunnel = client.tunnel_id or client.peer_id
         _LOGGER.warning(
             "VPN toggle starting WG client name=%s group_id=%s peer_id=%s tunnel_id=%s (call arg=%s)",
