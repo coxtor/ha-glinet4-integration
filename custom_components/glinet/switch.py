@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import random
 from typing import TYPE_CHECKING, Any
 
 from homeassistant.components.switch import SwitchEntity
@@ -26,7 +27,9 @@ async def async_setup_entry(
 ) -> None:
     """Set up the Pi-hole switch."""
     router: GLinetRouter = entry.runtime_data
-    switches: list[WifiApSwitch | WireGuardSwitch | TailscaleSwitch] = []
+    switches: list[
+        WifiApSwitch | WireGuardSwitch | TailscaleSwitch | VpnToggleSwitch
+    ] = []
     if router.wireguard_clients:
         # TODO detect all configured wireguard, openvpn, shadowsocks and
         # TOR clients & servers with router/vpn/status? and gen a switch for each
@@ -34,6 +37,7 @@ async def async_setup_entry(
             WireGuardSwitch(router, client)
             for client in router.wireguard_clients.values()
         ]
+        switches.append(VpnToggleSwitch(router))
     if router.tailscale_switch_exposed:
         switches.append(TailscaleSwitch(router))
     for iface_name, iface in router.wifi_ifaces.items():
@@ -295,3 +299,82 @@ class WireGuardSwitch(GliSwitchBase):
         """Update the switch state. A user may have many so don't call the API for each."""
         _LOGGER.debug("Updating WG client switch state from stored info")
         self._attr_is_on = self._client in (self._router.wireguard_connections or [])
+
+
+class VpnToggleSwitch(GliSwitchBase):
+    """A simple VPN on/off toggle that picks a WG client when turning on."""
+
+    _attr_icon = "mdi:vpn"
+
+    @property
+    def name(self) -> str:
+        """Return the name of the switch."""
+        return "VPN"
+
+    @property
+    def unique_id(self) -> str:
+        """Return the unique id of the switch."""
+        return f"glinet_switch/{self._router.factory_mac}/vpn_toggle"
+
+    def _pick_client(self) -> WireGuardClient | None:
+        """Pick a WG client to connect to.
+
+        TODO: when gli4py exposes per-peer quality metrics (latency, load,
+        handshake age), prefer the best one instead of random.
+        """
+        clients = list(self._router.wireguard_clients.values())
+        if not clients:
+            return None
+        return random.choice(clients)
+
+    async def async_turn_on(self, **_: Any) -> None:
+        """Connect a VPN client (random pick from configured WG clients)."""
+        if self._router.wireguard_connections:
+            _LOGGER.debug("VPN already connected, turn_on is a no-op")
+            self._attr_is_on = True
+            self.async_write_ha_state()
+            return
+
+        client = self._pick_client()
+        if client is None:
+            _LOGGER.warning("No WireGuard clients configured, cannot start VPN")
+            return
+
+        try:
+            _LOGGER.debug("Starting VPN via WG client %s", client.name)
+            await self._router.api.wireguard_client_start(
+                client.group_id, client.tunnel_id or client.peer_id
+            )
+        except OSError:
+            _LOGGER.exception("Unable to start VPN (WG client %s)", client.name)
+        else:
+            self._attr_is_on = True
+            self.async_write_ha_state()
+            await self._router.update_wireguard_client_state()
+            await self.async_update()
+
+    async def async_turn_off(self, **_: Any) -> None:
+        """Disconnect any active VPN clients."""
+        active = list(self._router.wireguard_connections or [])
+        if not active:
+            self._attr_is_on = False
+            self.async_write_ha_state()
+            return
+
+        for client in active:
+            try:
+                await self._router.api.wireguard_client_stop(
+                    client.tunnel_id or client.peer_id
+                )
+            except OSError:
+                _LOGGER.exception("Unable to stop VPN (WG client %s)", client.name)
+
+        self._attr_is_on = False
+        self.async_write_ha_state()
+        await self._router.update_wireguard_client_state()
+        await self.async_update()
+
+    @callback
+    async def async_update(self) -> None:
+        """Update toggle state from cached router info."""
+        self._attr_is_on = bool(self._router.wireguard_connections)
