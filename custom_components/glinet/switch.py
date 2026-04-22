@@ -6,6 +6,8 @@ import logging
 import random
 from typing import TYPE_CHECKING, Any
 
+from gli4py.error_handling import APIClientError, NonZeroResponse
+
 from homeassistant.components.switch import SwitchEntity
 from homeassistant.const import EntityCategory
 from homeassistant.core import callback
@@ -256,6 +258,15 @@ class WireGuardSwitch(GliSwitchBase):
 
     async def async_turn_on(self, **_: Any) -> None:
         """Turn on the service."""
+        peer_or_tunnel = self._client.tunnel_id or self._client.peer_id
+        _LOGGER.info(
+            "WG switch turn_on name=%s group_id=%s peer_id=%s tunnel_id=%s (arg=%s)",
+            self._client.name,
+            self._client.group_id,
+            self._client.peer_id,
+            self._client.tunnel_id,
+            peer_or_tunnel,
+        )
         try:
             # TODO Verify that the API doesn't do this for us
             if (
@@ -265,15 +276,19 @@ class WireGuardSwitch(GliSwitchBase):
                 and self._client not in self._router.connected_wireguard_clients
             ):
                 for client in self._router.connected_wireguard_clients:
+                    _LOGGER.info(
+                        "WG switch pre-stopping active client %s", client.name
+                    )
                     await self._router.api.wireguard_client_stop(client.peer_id)
                 # TODO may need to introduce a delay here, or await confirmation of the stop
 
-            await self._router.api.wireguard_client_start(
-                self._client.group_id, self._client.tunnel_id or self._client.peer_id
+            result = await self._router.api.wireguard_client_start(
+                self._client.group_id, peer_or_tunnel
             )
-        except OSError:
-            _LOGGER.exception("Unable to enable WG client")
+        except (OSError, APIClientError, NonZeroResponse) as err:
+            _LOGGER.exception("Unable to enable WG client: %s", err)
         else:
+            _LOGGER.info("wireguard_client_start returned: %r", result)
             # Optimistic; next router poll will confirm. Don't refresh now:
             # the tunnel takes a few seconds to come up and the signal would
             # flip us back to off immediately.
@@ -375,14 +390,25 @@ class VpnToggleSwitch(GliSwitchBase):
             _LOGGER.warning("No WireGuard clients configured, cannot start VPN")
             return
 
-        _LOGGER.debug("Starting VPN via WG client %s", client.name)
+        peer_or_tunnel = client.tunnel_id or client.peer_id
+        _LOGGER.info(
+            "VPN toggle starting WG client name=%s group_id=%s peer_id=%s tunnel_id=%s (call arg=%s)",
+            client.name,
+            client.group_id,
+            client.peer_id,
+            client.tunnel_id,
+            peer_or_tunnel,
+        )
         try:
-            await self._router.api.wireguard_client_start(
-                client.group_id, client.tunnel_id or client.peer_id
+            result = await self._router.api.wireguard_client_start(
+                client.group_id, peer_or_tunnel
             )
-        except OSError:
-            _LOGGER.exception("Unable to start VPN (WG client %s)", client.name)
+        except (OSError, APIClientError, NonZeroResponse) as err:
+            _LOGGER.exception(
+                "Unable to start VPN (WG client %s): %s", client.name, err
+            )
             return
+        _LOGGER.info("wireguard_client_start returned: %r", result)
 
         # Optimistic: the WG tunnel takes a few seconds to come up; the next
         # router poll will sync via signal_vpn_update. Refreshing now would
@@ -399,12 +425,20 @@ class VpnToggleSwitch(GliSwitchBase):
             return
 
         for client in active:
+            peer_or_tunnel = client.tunnel_id or client.peer_id
+            _LOGGER.info(
+                "VPN toggle stopping WG client name=%s (arg=%s)",
+                client.name,
+                peer_or_tunnel,
+            )
             try:
-                await self._router.api.wireguard_client_stop(
-                    client.tunnel_id or client.peer_id
+                result = await self._router.api.wireguard_client_stop(peer_or_tunnel)
+            except (OSError, APIClientError, NonZeroResponse) as err:
+                _LOGGER.exception(
+                    "Unable to stop VPN (WG client %s): %s", client.name, err
                 )
-            except OSError:
-                _LOGGER.exception("Unable to stop VPN (WG client %s)", client.name)
+                continue
+            _LOGGER.info("wireguard_client_stop returned: %r", result)
 
         self._attr_is_on = False
         self.async_write_ha_state()
