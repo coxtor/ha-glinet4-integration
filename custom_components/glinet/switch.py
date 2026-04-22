@@ -274,10 +274,11 @@ class WireGuardSwitch(GliSwitchBase):
         except OSError:
             _LOGGER.exception("Unable to enable WG client")
         else:
+            # Optimistic; next router poll will confirm. Don't refresh now:
+            # the tunnel takes a few seconds to come up and the signal would
+            # flip us back to off immediately.
             self._attr_is_on = True
             self.async_write_ha_state()
-            await self._router.update_wireguard_client_state()
-            await self.async_update()
 
     async def async_turn_off(self, **_: Any) -> None:
         """Turn off the service."""
@@ -383,11 +384,11 @@ class VpnToggleSwitch(GliSwitchBase):
             _LOGGER.exception("Unable to start VPN (WG client %s)", client.name)
             return
 
-        # Optimistic update: reflect immediately, real state syncs via the
-        # dispatcher signal once update_wireguard_client_state completes.
+        # Optimistic: the WG tunnel takes a few seconds to come up; the next
+        # router poll will sync via signal_vpn_update. Refreshing now would
+        # race the dial-up and flip us straight back to off.
         self._attr_is_on = True
         self.async_write_ha_state()
-        await self._router.update_wireguard_client_state()
 
     async def async_turn_off(self, **_: Any) -> None:
         """Disconnect any active VPN clients (also flips individual WG switches)."""
