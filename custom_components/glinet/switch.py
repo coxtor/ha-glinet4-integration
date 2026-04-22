@@ -389,75 +389,134 @@ class VpnToggleSwitch(GliSwitchBase):
         self._attr_is_on = bool(self._router.wireguard_connections)
         self.async_write_ha_state()
 
-    def _pick_client(self) -> WireGuardClient | None:
-        """Pick a WG client to enable.
-
-        On GL-iNet firmware >= 4.8 there is exactly one tunnel slot, so only
-        the peer currently assigned to that slot has a tunnel_id — others
-        cannot be started without first reassigning the slot via an RPC
-        gli4py does not yet expose (vpn-client.set_peer / wg-client.set_config).
-        TODO: once gli4py can switch the active peer, pick randomly (or by
-        latency/load if exposed). For now we always use the configured peer.
-        """
-        active = [
-            c for c in self._router.wireguard_clients.values() if c.tunnel_id is not None
-        ]
-        if active:
-            # On 4.8+ there will be exactly one; on older firmware there is
-            # no tunnel_id, and we fall through to the random pick below.
-            return random.choice(active)
+    def _pick_random_peer(self) -> WireGuardClient | None:
+        """Pick a random peer from all configured clients."""
         clients = list(self._router.wireguard_clients.values())
         if not clients:
             return None
         return random.choice(clients)
 
+    def _active_tunnel_id(self) -> int | None:
+        """Return the tunnel_id of the currently-provisioned tunnel slot (4.8+)."""
+        for c in self._router.wireguard_clients.values():
+            if c.tunnel_id is not None:
+                return c.tunnel_id
+        return None
+
+    async def _assign_peer_and_start(
+        self, peer: WireGuardClient, tunnel_id: int
+    ) -> dict | None:
+        """Reassign the tunnel slot to a new peer and enable it.
+
+        gli4py has no wrapper for this, so we call the raw RPC. Endpoint is
+        based on community research — if the router rejects it, we log and
+        let the caller fall back to plain enable of whatever peer is active.
+        """
+        payload = self._router.api.gen_sid_payload(
+            "call",
+            [
+                "vpn-client",
+                "set_tunnel",
+                {
+                    "tunnel_id": tunnel_id,
+                    "group_id": peer.group_id,
+                    "peer_id": peer.peer_id,
+                    "enabled": True,
+                },
+            ],
+            self._router.api.sid,
+        )
+        _LOGGER.warning(
+            "VPN toggle: raw set_tunnel to switch peer name=%s peer_id=%s tunnel_id=%s",
+            peer.name,
+            peer.peer_id,
+            tunnel_id,
+        )
+        try:
+            return await self._router.api._request(payload)  # noqa: SLF001
+        except (OSError, APIClientError, NonZeroResponse) as err:
+            _LOGGER.exception("Raw set_tunnel failed: %s", err)
+            return None
+
     async def async_turn_on(self, **_: Any) -> None:
-        """Connect a VPN client (random pick from configured WG clients)."""
+        """Enable VPN; pick a random peer and switch the tunnel slot to it."""
         if self._router.wireguard_connections:
             _LOGGER.debug("VPN already connected, turn_on is a no-op")
             self._attr_is_on = True
             self.async_write_ha_state()
             return
 
-        client = self._pick_client()
-        if client is None:
+        peer = self._pick_random_peer()
+        if peer is None:
             _LOGGER.warning("No WireGuard clients configured, cannot start VPN")
             return
 
-        if client.tunnel_id is None:
+        tunnel_id = peer.tunnel_id or self._active_tunnel_id()
+        if tunnel_id is None:
             _LOGGER.warning(
-                "VPN toggle: tunnel_id unknown for %s, refreshing state first",
-                client.name,
+                "VPN toggle: no tunnel_id known yet, refreshing router state"
             )
             await self._router.update_wireguard_client_state()
-        peer_or_tunnel = client.tunnel_id or client.peer_id
+            tunnel_id = peer.tunnel_id or self._active_tunnel_id()
+
         _LOGGER.warning(
-            "VPN toggle starting WG client name=%s group_id=%s peer_id=%s tunnel_id=%s (call arg=%s)",
-            client.name,
-            client.group_id,
-            client.peer_id,
-            client.tunnel_id,
-            peer_or_tunnel,
+            "VPN toggle picked random peer=%s peer_id=%s group_id=%s tunnel_id=%s",
+            peer.name,
+            peer.peer_id,
+            peer.group_id,
+            tunnel_id,
+        )
+
+        if tunnel_id is not None and peer.tunnel_id != tunnel_id:
+            # Peer isn't the one in the slot → reassign via raw RPC.
+            result = await self._assign_peer_and_start(peer, tunnel_id)
+            _LOGGER.warning("raw set_tunnel returned: %r", result)
+            if result is None or _rpc_failed(result) is not None:
+                _LOGGER.warning(
+                    "Peer switch RPC not accepted; falling back to enabling "
+                    "whichever peer is currently in the tunnel slot"
+                )
+                # Fall back to just enabling the active-slot peer.
+                peer = next(
+                    (
+                        c
+                        for c in self._router.wireguard_clients.values()
+                        if c.tunnel_id is not None
+                    ),
+                    peer,
+                )
+            else:
+                # set_tunnel with enabled=true already started it; update
+                # local state and we're done.
+                self._attr_is_on = True
+                self.async_write_ha_state()
+                return
+
+        # Plain enable path (peer already assigned, or fallback).
+        call_arg = peer.tunnel_id or peer.peer_id
+        _LOGGER.warning(
+            "VPN toggle starting peer=%s group_id=%s tunnel_id=%s (call arg=%s)",
+            peer.name,
+            peer.group_id,
+            peer.tunnel_id,
+            call_arg,
         )
         try:
             result = await self._router.api.wireguard_client_start(
-                client.group_id, peer_or_tunnel
+                peer.group_id, call_arg
             )
         except (OSError, APIClientError, NonZeroResponse) as err:
             _LOGGER.exception(
-                "Unable to start VPN (WG client %s): %s", client.name, err
+                "Unable to start VPN (peer %s): %s", peer.name, err
             )
             return
         _LOGGER.warning("wireguard_client_start returned: %r", result)
         if (rpc_err := _rpc_failed(result)) is not None:
             _LOGGER.warning(
-                "Router rejected VPN start for %s: %s", client.name, rpc_err
+                "Router rejected VPN start for %s: %s", peer.name, rpc_err
             )
             return
 
-        # Optimistic: the WG tunnel takes a few seconds to come up; the next
-        # router poll will sync via signal_vpn_update. Refreshing now would
-        # race the dial-up and flip us straight back to off.
         self._attr_is_on = True
         self.async_write_ha_state()
 

@@ -261,12 +261,15 @@ class GLinetRouter:
             )
             async with async_timeout.timeout(API_TIMEOUT_SECONDS):
                 response = await api_callable()
-        except (TimeoutError, aiohttp.ClientError):
+        except (TimeoutError, aiohttp.ClientError) as exc:
             if not self._connect_error:
                 self._connect_error = True
-                _LOGGER.exception(
-                    "GL-iNet router %s did not respond in time",
+                # Routine during VPN toggles / connectivity blips — log compactly
+                # without a traceback; the next poll recovers.
+                _LOGGER.warning(
+                    "GL-iNet router %s did not respond in time: %s",
                     self._host,
+                    exc,
                 )
             return None
         except TokenError as exc:
