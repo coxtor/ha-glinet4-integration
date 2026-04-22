@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import random
 from typing import TYPE_CHECKING, Any
+
+import aiohttp
 
 from gli4py.error_handling import APIClientError, NonZeroResponse
 
@@ -435,11 +438,26 @@ class VpnToggleSwitch(GliSwitchBase):
             peer.peer_id,
             tunnel_id,
         )
-        try:
-            return await self._router.api._request(payload)  # noqa: SLF001
-        except (OSError, APIClientError, NonZeroResponse) as err:
-            _LOGGER.exception("Raw set_tunnel failed: %s", err)
-            return None
+        # The router often drops existing keep-alive TCP sockets right after
+        # a VPN state change, so the first attempt can hit ConnectionReset.
+        # Retry briefly with a fresh connection before giving up.
+        last_err: BaseException | None = None
+        for attempt in range(3):
+            try:
+                return await self._router.api._request(payload)  # noqa: SLF001
+            except (OSError, aiohttp.ClientError) as err:
+                last_err = err
+                _LOGGER.warning(
+                    "set_tunnel attempt %d failed (%s); retrying",
+                    attempt + 1,
+                    err,
+                )
+                await asyncio.sleep(0.5)
+            except (APIClientError, NonZeroResponse) as err:
+                _LOGGER.warning("set_tunnel rejected by router: %s", err)
+                return None
+        _LOGGER.warning("set_tunnel gave up after retries: %s", last_err)
+        return None
 
     async def async_turn_on(self, **_: Any) -> None:
         """Enable VPN; pick a random peer and switch the tunnel slot to it."""
