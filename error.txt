@@ -1,0 +1,285 @@
+2026-04-22 10:31:00.985 ERROR (MainThread) [custom_components.glinet.config_flow] Unexpected exception
+Traceback (most recent call last):
+  File "/usr/local/lib/python3.14/site-packages/aiohttp/connector.py", line 1313, in _wrap_create_connection
+    return await self._loop.create_connection(*args, **kwargs, sock=sock)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.14/asyncio/base_events.py", line 1198, in create_connection
+    transport, protocol = await self._create_connection_transport(
+                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<2 lines>...
+        ssl_shutdown_timeout=ssl_shutdown_timeout)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.14/asyncio/base_events.py", line 1231, in _create_connection_transport
+    await waiter
+  File "/usr/local/lib/python3.14/asyncio/sslproto.py", line 581, in _on_handshake_complete
+    raise handshake_exc
+  File "/usr/local/lib/python3.14/asyncio/sslproto.py", line 563, in _do_handshake
+    self._sslobj.do_handshake()
+    ~~~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "/usr/local/lib/python3.14/ssl.py", line 951, in do_handshake
+    self._sslobj.do_handshake()
+    ~~~~~~~~~~~~~~~~~~~~~~~~~^^
+ssl.SSLCertVerificationError: [SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: self-signed certificate (_ssl.c:1081)
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/config/custom_components/glinet/config_flow.py", line 174, in async_step_user
+    info = await validate_input(user_input, self.hass)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/config/custom_components/glinet/config_flow.py", line 128, in validate_input
+    if not await hub.connect():
+           ^^^^^^^^^^^^^^^^^^^
+  File "/config/custom_components/glinet/config_flow.py", line 85, in connect
+    res: bool = await self.router.router_reachable(self.username)
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.14/site-packages/gli4py/glinet.py", line 128, in router_reachable
+    res = await self._challenge(username)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.14/site-packages/gli4py/glinet.py", line 116, in _challenge
+    return await self._request(challenge_data)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.14/site-packages/uplink/clients/io/asyncio_strategy.py", line 32, in execute
+    return await executable.execute()
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.14/site-packages/uplink/clients/io/asyncio_strategy.py", line 19, in invoke
+    response = await callback.on_failure(type(error), error, tb)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.14/site-packages/uplink/clients/io/asyncio_strategy.py", line 19, in invoke
+    response = await callback.on_failure(type(error), error, tb)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.14/site-packages/uplink/clients/io/asyncio_strategy.py", line 19, in invoke
+    response = await callback.on_failure(type(error), error, tb)
+                     ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.14/site-packages/uplink/clients/io/execution.py", line 105, in on_failure
+    return self._io.fail(exc_type, exc_val, exc_tb)
+           ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.14/site-packages/uplink/clients/io/execution.py", line 125, in fail
+    return self._io.fail(exc_type, exc_val, exc_tb)
+           ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.14/site-packages/uplink/clients/io/interfaces.py", line 352, in fail
+    compat.reraise(exc_type, exc_val, exc_tb)
+    ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.14/site-packages/six.py", line 724, in reraise
+    raise value
+  File "/usr/local/lib/python3.14/site-packages/uplink/clients/io/asyncio_strategy.py", line 16, in invoke
+    response = await func(*args, **kwargs)
+                     ~~~~^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.14/site-packages/uplink/builder.py", line 53, in wrapper
+    return func(self._consumer, *args, **kwargs)
+  File "/usr/local/lib/python3.14/site-packages/uplink/hooks.py", line 109, in handle_exception
+    compat.reraise(exc_type, exc_val, exc_tb)
+    ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.14/site-packages/six.py", line 724, in reraise
+    raise value
+  File "/usr/local/lib/python3.14/site-packages/uplink/clients/io/asyncio_strategy.py", line 16, in invoke
+    response = await func(*args, **kwargs)
+                     ~~~~^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.14/site-packages/uplink/builder.py", line 53, in wrapper
+    return func(self._consumer, *args, **kwargs)
+  File "/usr/local/lib/python3.14/site-packages/uplink/hooks.py", line 109, in handle_exception
+    compat.reraise(exc_type, exc_val, exc_tb)
+    ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.14/site-packages/six.py", line 724, in reraise
+    raise value
+  File "/usr/local/lib/python3.14/site-packages/uplink/clients/io/asyncio_strategy.py", line 16, in invoke
+    response = await func(*args, **kwargs)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.14/site-packages/uplink/clients/aiohttp_.py", line 134, in send
+    response = await session.request(method, url, **extras)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.14/site-packages/aiohttp/client.py", line 779, in _request
+    resp = await handler(req)
+           ^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.14/site-packages/aiohttp/client_middlewares.py", line 36, in single_middleware_handler
+    return await middleware(req, handler)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/src/homeassistant/homeassistant/helpers/aiohttp_client.py", line 72, in _ssrf_redirect_middleware
+    resp = await handler(request)
+           ^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.14/site-packages/aiohttp/client.py", line 734, in _connect_and_send_request
+    conn = await self._connector.connect(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        req, traces=traces, timeout=real_timeout
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/usr/local/lib/python3.14/site-packages/aiohttp/connector.py", line 672, in connect
+    proto = await self._create_connection(req, traces, timeout)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.14/site-packages/aiohttp/connector.py", line 1239, in _create_connection
+    _, proto = await self._create_direct_connection(req, traces, timeout)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.14/site-packages/aiohttp/connector.py", line 1611, in _create_direct_connection
+    raise last_exc
+  File "/usr/local/lib/python3.14/site-packages/aiohttp/connector.py", line 1580, in _create_direct_connection
+    transp, proto = await self._wrap_create_connection(
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<7 lines>...
+    )
+    ^
+  File "/usr/local/lib/python3.14/site-packages/aiohttp/connector.py", line 1315, in _wrap_create_connection
+    raise ClientConnectorCertificateError(req.connection_key, exc) from exc
+aiohttp.client_exceptions.ClientConnectorCertificateError: Cannot connect to host 192.168.178.165:443 ssl:True [SSLCertVerificationError: (1, '[SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: self-signed certificate (_ssl.c:1081)')]
+2026-04-22 10:31:02.928 ERROR (MainThread) [homeassistant.components.websocket_api.http.connection] [140065409438304] Error during service call to notify.mobile_app_victor_mob_main: Device(s) with webhook id(s) 4a28cc4656000afb6de5140657b7586815b9819d32e79e936d3bbcc733a8c203 not connected to local push notifications
+2026-04-22 10:31:08.630 ERROR (MainThread) [homeassistant] Error doing job: Task exception was never retrieved (task: None)
+Traceback (most recent call last):
+  File "/usr/local/lib/python3.14/site-packages/aiohttp/connector.py", line 1298, in _wrap_create_connection
+    sock = await aiohappyeyeballs.start_connection(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<6 lines>...
+    )
+    ^
+  File "/usr/local/lib/python3.14/site-packages/aiohappyeyeballs/impl.py", line 73, in start_connection
+    sock = await _connect_sock(
+           ^^^^^^^^^^^^^^^^^^^^
+    ...<6 lines>...
+    )
+    ^
+  File "/usr/local/lib/python3.14/site-packages/aiohappyeyeballs/impl.py", line 208, in _connect_sock
+    await loop.sock_connect(sock, address)
+  File "/usr/local/lib/python3.14/asyncio/selector_events.py", line 645, in sock_connect
+    return await fut
+           ^^^^^^^^^
+asyncio.exceptions.CancelledError
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/usr/local/lib/python3.14/site-packages/aiohttp/client.py", line 734, in _connect_and_send_request
+    conn = await self._connector.connect(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        req, traces=traces, timeout=real_timeout
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/usr/local/lib/python3.14/site-packages/aiohttp/connector.py", line 672, in connect
+    proto = await self._create_connection(req, traces, timeout)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.14/site-packages/aiohttp/connector.py", line 1239, in _create_connection
+    _, proto = await self._create_direct_connection(req, traces, timeout)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.14/site-packages/aiohttp/connector.py", line 1611, in _create_direct_connection
+    raise last_exc
+  File "/usr/local/lib/python3.14/site-packages/aiohttp/connector.py", line 1580, in _create_direct_connection
+    transp, proto = await self._wrap_create_connection(
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<7 lines>...
+    )
+    ^
+  File "/usr/local/lib/python3.14/site-packages/aiohttp/connector.py", line 1295, in _wrap_create_connection
+    async with ceil_timeout(
+               ~~~~~~~~~~~~^
+        timeout.sock_connect, ceil_threshold=timeout.ceil_threshold
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ):
+    ^
+  File "/usr/local/lib/python3.14/asyncio/timeouts.py", line 114, in __aexit__
+    raise TimeoutError from exc_val
+TimeoutError
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/usr/src/homeassistant/homeassistant/helpers/discovery_flow.py", line 137, in _async_start
+    await gather_with_limited_concurrency(FLOW_INIT_LIMIT, *init_coros)
+  File "/usr/src/homeassistant/homeassistant/util/async_.py", line 113, in gather_with_limited_concurrency
+    return await gather(
+           ^^^^^^^^^^^^^
+    ...<2 lines>...
+    )
+    ^
+  File "/usr/src/homeassistant/homeassistant/util/async_.py", line 111, in sem_task
+    return await task
+           ^^^^^^^^^^
+  File "/usr/src/homeassistant/homeassistant/config_entries.py", line 1493, in async_init
+    flow, result = await self._async_init(flow_id, handler, context, data)
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/src/homeassistant/homeassistant/config_entries.py", line 1556, in _async_init
+    result = await self._async_handle_step(flow, flow.init_step, data)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/src/homeassistant/homeassistant/data_entry_flow.py", line 483, in _async_handle_step
+    result: _FlowResultT = await getattr(flow, method)(user_input)
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/config/custom_components/glinet/config_flow.py", line 229, in async_step_dhcp
+    entry = await validate_input(
+            ^^^^^^^^^^^^^^^^^^^^^
+        discovery_input, raise_on_invalid_auth=False, hass=self.hass
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/config/custom_components/glinet/config_flow.py", line 128, in validate_input
+    if not await hub.connect():
+           ^^^^^^^^^^^^^^^^^^^
+  File "/config/custom_components/glinet/config_flow.py", line 85, in connect
+    res: bool = await self.router.router_reachable(self.username)
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.14/site-packages/gli4py/glinet.py", line 128, in router_reachable
+    res = await self._challenge(username)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.14/site-packages/gli4py/glinet.py", line 116, in _challenge
+    return await self._request(challenge_data)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.14/site-packages/uplink/clients/io/asyncio_strategy.py", line 32, in execute
+    return await executable.execute()
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.14/site-packages/uplink/clients/io/asyncio_strategy.py", line 19, in invoke
+    response = await callback.on_failure(type(error), error, tb)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.14/site-packages/uplink/clients/io/asyncio_strategy.py", line 19, in invoke
+    response = await callback.on_failure(type(error), error, tb)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.14/site-packages/uplink/clients/io/asyncio_strategy.py", line 19, in invoke
+    response = await callback.on_failure(type(error), error, tb)
+                     ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.14/site-packages/uplink/clients/io/execution.py", line 105, in on_failure
+    return self._io.fail(exc_type, exc_val, exc_tb)
+           ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.14/site-packages/uplink/clients/io/execution.py", line 125, in fail
+    return self._io.fail(exc_type, exc_val, exc_tb)
+           ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.14/site-packages/uplink/clients/io/interfaces.py", line 352, in fail
+    compat.reraise(exc_type, exc_val, exc_tb)
+    ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.14/site-packages/six.py", line 724, in reraise
+    raise value
+  File "/usr/local/lib/python3.14/site-packages/uplink/clients/io/asyncio_strategy.py", line 16, in invoke
+    response = await func(*args, **kwargs)
+                     ~~~~^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.14/site-packages/uplink/builder.py", line 53, in wrapper
+    return func(self._consumer, *args, **kwargs)
+  File "/usr/local/lib/python3.14/site-packages/uplink/hooks.py", line 109, in handle_exception
+    compat.reraise(exc_type, exc_val, exc_tb)
+    ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.14/site-packages/six.py", line 724, in reraise
+    raise value
+  File "/usr/local/lib/python3.14/site-packages/uplink/clients/io/asyncio_strategy.py", line 16, in invoke
+    response = await func(*args, **kwargs)
+                     ~~~~^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.14/site-packages/uplink/builder.py", line 53, in wrapper
+    return func(self._consumer, *args, **kwargs)
+  File "/usr/local/lib/python3.14/site-packages/uplink/hooks.py", line 109, in handle_exception
+    compat.reraise(exc_type, exc_val, exc_tb)
+    ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.14/site-packages/six.py", line 724, in reraise
+    raise value
+  File "/usr/local/lib/python3.14/site-packages/uplink/clients/io/asyncio_strategy.py", line 16, in invoke
+    response = await func(*args, **kwargs)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.14/site-packages/uplink/clients/aiohttp_.py", line 134, in send
+    response = await session.request(method, url, **extras)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.14/site-packages/aiohttp/client.py", line 779, in _request
+    resp = await handler(req)
+           ^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.14/site-packages/aiohttp/client_middlewares.py", line 36, in single_middleware_handler
+    return await middleware(req, handler)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/src/homeassistant/homeassistant/helpers/aiohttp_client.py", line 72, in _ssrf_redirect_middleware
+    resp = await handler(request)
+           ^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.14/site-packages/aiohttp/client.py", line 738, in _connect_and_send_request
+    raise ConnectionTimeoutError(
+        f"Connection timeout to host {req.url}"
+    ) from exc
+aiohttp.client_exceptions.ConnectionTimeoutError: Connection timeout to host http://192.168.178.38/rpc

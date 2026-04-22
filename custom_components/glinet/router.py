@@ -37,7 +37,7 @@ from homeassistant.helpers.event import async_track_time_interval
 from homeassistant.util import dt as dt_util
 
 from .const import API_PATH, DOMAIN
-from .utils import adjust_mac
+from .utils import adjust_mac, normalize_host
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Coroutine
@@ -94,7 +94,7 @@ class GLinetRouter:
 
         # gli4py API
         self._api: GLinet
-        self._host: str = entry.data[CONF_HOST]
+        self._host: str = normalize_host(entry.data[CONF_HOST])
 
         # Stable properties
         self._factory_mac: str = "UNKNOWN"
@@ -187,12 +187,14 @@ class GLinetRouter:
     async def get_api(self) -> GLinet:
         """Optimistically returns a GLinet object for connection to the API, no test included."""
         conf = self._entry.data
-        shared_session = async_get_clientsession(self.hass)
+        # Use unverified SSL for https hosts to support GL-iNet's self-signed certs.
+        verify_ssl = not self._host.startswith("https://")
+        shared_session = async_get_clientsession(self.hass, verify_ssl=verify_ssl)
         ha_client = AiohttpClient(session=shared_session)
 
         if CONF_PASSWORD in conf:
             router = GLinet(
-                sync=False, base_url=conf[CONF_HOST] + API_PATH, client=ha_client
+                sync=False, base_url=self._host + API_PATH, client=ha_client
             )
             await router.login(conf[CONF_USERNAME], conf[CONF_PASSWORD])
             return router

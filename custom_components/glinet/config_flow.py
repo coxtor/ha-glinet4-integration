@@ -38,7 +38,7 @@ from .const import (
     GLINET_DEFAULT_USERNAME,
     GLINET_FRIENDLY_NAME,
 )
-from .utils import adjust_mac
+from .utils import adjust_mac, normalize_host
 
 if TYPE_CHECKING:
     from homeassistant.config_entries import ConfigFlowResult
@@ -69,11 +69,16 @@ class TestingHub:
 
     def __init__(self, username: str, host: str, hass: HomeAssistant) -> None:
         """Initialize."""
-        self.host: str = host
+        self.host: str = normalize_host(host)
         self.username: str = username
+        # GL-iNet routers ship with self-signed certs; skip SSL verification
+        # when connecting via https so users can use the factory certificate.
+        verify_ssl = not self.host.startswith("https://")
         self.router: GLinet = GLinet(
             base_url=self.host + API_PATH,
-            client=AiohttpClient(session=async_get_clientsession(hass)),
+            client=AiohttpClient(
+                session=async_get_clientsession(hass, verify_ssl=verify_ssl)
+            ),
             sync=False,
         )
         self.router_mac: str = ""
@@ -141,7 +146,7 @@ async def validate_input(
         CONF_MAC: hub.router_mac,
         "data": {
             CONF_USERNAME: data.get(CONF_USERNAME, GLINET_DEFAULT_USERNAME),
-            CONF_HOST: data[CONF_HOST],
+            CONF_HOST: normalize_host(data[CONF_HOST]),
             CONF_API_TOKEN: hub.router.sid,
             CONF_PASSWORD: (
                 data.get(CONF_PASSWORD, GLINET_DEFAULT_PW) if valid_auth else ""

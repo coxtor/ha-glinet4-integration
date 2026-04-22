@@ -1,6 +1,19 @@
 """Utility functions for GL-iNet routers."""
 
 
+def normalize_host(host: str) -> str:
+    """Ensure the host string carries an http/https scheme and no trailing slash.
+
+    Defaults to http:// when no scheme is present, matching the legacy default.
+    """
+    host = (host or "").strip().rstrip("/")
+    if not host:
+        return host
+    if not host.startswith(("http://", "https://")):
+        host = "http://" + host
+    return host
+
+
 def adjust_mac(mac: str, delta: int, sep: str = ":") -> str:
     """Increment a MAC address by 1.
 

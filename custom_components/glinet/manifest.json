@@ -1,7 +1,7 @@
 {
   "domain": "glinet",
   "name": "GL-iNet",
-  "codeowners": ["@HarvsG"],
+  "codeowners": ["@Coxtor","@HarvsG"],
   "config_flow": true,
   "dependencies": ["network", "http"],
   "dhcp": [{ "hostname": "*gl-*", "macaddress": "9483C4*" }],
