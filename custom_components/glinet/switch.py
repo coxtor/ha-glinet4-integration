@@ -259,7 +259,7 @@ class WireGuardSwitch(GliSwitchBase):
     async def async_turn_on(self, **_: Any) -> None:
         """Turn on the service."""
         peer_or_tunnel = self._client.tunnel_id or self._client.peer_id
-        _LOGGER.info(
+        _LOGGER.warning(
             "WG switch turn_on name=%s group_id=%s peer_id=%s tunnel_id=%s (arg=%s)",
             self._client.name,
             self._client.group_id,
@@ -276,7 +276,7 @@ class WireGuardSwitch(GliSwitchBase):
                 and self._client not in self._router.connected_wireguard_clients
             ):
                 for client in self._router.connected_wireguard_clients:
-                    _LOGGER.info(
+                    _LOGGER.warning(
                         "WG switch pre-stopping active client %s", client.name
                     )
                     await self._router.api.wireguard_client_stop(client.peer_id)
@@ -288,7 +288,7 @@ class WireGuardSwitch(GliSwitchBase):
         except (OSError, APIClientError, NonZeroResponse) as err:
             _LOGGER.exception("Unable to enable WG client: %s", err)
         else:
-            _LOGGER.info("wireguard_client_start returned: %r", result)
+            _LOGGER.warning("wireguard_client_start returned: %r", result)
             # Optimistic; next router poll will confirm. Don't refresh now:
             # the tunnel takes a few seconds to come up and the signal would
             # flip us back to off immediately.
@@ -391,7 +391,7 @@ class VpnToggleSwitch(GliSwitchBase):
             return
 
         peer_or_tunnel = client.tunnel_id or client.peer_id
-        _LOGGER.info(
+        _LOGGER.warning(
             "VPN toggle starting WG client name=%s group_id=%s peer_id=%s tunnel_id=%s (call arg=%s)",
             client.name,
             client.group_id,
@@ -408,7 +408,7 @@ class VpnToggleSwitch(GliSwitchBase):
                 "Unable to start VPN (WG client %s): %s", client.name, err
             )
             return
-        _LOGGER.info("wireguard_client_start returned: %r", result)
+        _LOGGER.warning("wireguard_client_start returned: %r", result)
 
         # Optimistic: the WG tunnel takes a few seconds to come up; the next
         # router poll will sync via signal_vpn_update. Refreshing now would
@@ -426,7 +426,7 @@ class VpnToggleSwitch(GliSwitchBase):
 
         for client in active:
             peer_or_tunnel = client.tunnel_id or client.peer_id
-            _LOGGER.info(
+            _LOGGER.warning(
                 "VPN toggle stopping WG client name=%s (arg=%s)",
                 client.name,
                 peer_or_tunnel,
@@ -438,7 +438,7 @@ class VpnToggleSwitch(GliSwitchBase):
                     "Unable to stop VPN (WG client %s): %s", client.name, err
                 )
                 continue
-            _LOGGER.info("wireguard_client_stop returned: %r", result)
+            _LOGGER.warning("wireguard_client_stop returned: %r", result)
 
         self._attr_is_on = False
         self.async_write_ha_state()
