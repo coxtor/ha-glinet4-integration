@@ -418,10 +418,13 @@ class VpnToggleSwitch(GliSwitchBase):
                 "vpn-client",
                 "set_tunnel",
                 {
-                    "tunnel_id": tunnel_id,
-                    "group_id": peer.group_id,
-                    "peer_id": peer.peer_id,
                     "enabled": True,
+                    "tunnel_id": tunnel_id,
+                    "via": {
+                        "group_id": peer.group_id,
+                        "peer_id": peer.peer_id,
+                        "type": "wireguard",
+                    },
                 },
             ],
             self._router.api.sid,
