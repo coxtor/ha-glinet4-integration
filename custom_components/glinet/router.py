@@ -483,6 +483,8 @@ class GLinetRouter:
                 # If more modern firmware supports more than 1 client being connected, we need to change this
                 self._wireguard_connections.append(client)
 
+        async_dispatcher_send(self.hass, self.signal_vpn_update)
+
     def update_options(self, new_options: dict) -> bool:
         """Update router options.
 
@@ -521,6 +523,11 @@ class GLinetRouter:
     def signal_device_update(self) -> str:
         """Event specific per GL-iNet entry to signal updates in devices."""
         return f"{DOMAIN}-device-update-{self._factory_mac}"
+
+    @property
+    def signal_vpn_update(self) -> str:
+        """Event fired when VPN/WireGuard connection state changes."""
+        return f"{DOMAIN}-vpn-update-{self._factory_mac}"
 
     @property
     def host(self) -> str:

@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING, Any
 from homeassistant.components.switch import SwitchEntity
 from homeassistant.const import EntityCategory
 from homeassistant.core import callback
+from homeassistant.helpers.dispatcher import async_dispatcher_connect
 
 from .router import wifi_iface_band_label
 
@@ -294,6 +295,22 @@ class WireGuardSwitch(GliSwitchBase):
             await self._router.update_wireguard_client_state()
             await self.async_update()
 
+    async def async_added_to_hass(self) -> None:
+        """Subscribe to VPN state changes so sibling toggles re-render."""
+        self.async_on_remove(
+            async_dispatcher_connect(
+                self.hass,
+                self._router.signal_vpn_update,
+                self._handle_vpn_update,
+            )
+        )
+
+    @callback
+    def _handle_vpn_update(self) -> None:
+        """Re-read cached router state and push to HA."""
+        self._attr_is_on = self._client in (self._router.wireguard_connections or [])
+        self.async_write_ha_state()
+
     @callback
     async def async_update(self) -> None:
         """Update the switch state. A user may have many so don't call the API for each."""
@@ -315,6 +332,23 @@ class VpnToggleSwitch(GliSwitchBase):
     def unique_id(self) -> str:
         """Return the unique id of the switch."""
         return f"glinet_switch/{self._router.factory_mac}/vpn_toggle"
+
+    async def async_added_to_hass(self) -> None:
+        """Subscribe to VPN state changes from the router."""
+        self._attr_is_on = bool(self._router.wireguard_connections)
+        self.async_on_remove(
+            async_dispatcher_connect(
+                self.hass,
+                self._router.signal_vpn_update,
+                self._handle_vpn_update,
+            )
+        )
+
+    @callback
+    def _handle_vpn_update(self) -> None:
+        """Re-read cached router state and push to HA."""
+        self._attr_is_on = bool(self._router.wireguard_connections)
+        self.async_write_ha_state()
 
     def _pick_client(self) -> WireGuardClient | None:
         """Pick a WG client to connect to.
@@ -340,21 +374,23 @@ class VpnToggleSwitch(GliSwitchBase):
             _LOGGER.warning("No WireGuard clients configured, cannot start VPN")
             return
 
+        _LOGGER.debug("Starting VPN via WG client %s", client.name)
         try:
-            _LOGGER.debug("Starting VPN via WG client %s", client.name)
             await self._router.api.wireguard_client_start(
                 client.group_id, client.tunnel_id or client.peer_id
             )
         except OSError:
             _LOGGER.exception("Unable to start VPN (WG client %s)", client.name)
-        else:
-            self._attr_is_on = True
-            self.async_write_ha_state()
-            await self._router.update_wireguard_client_state()
-            await self.async_update()
+            return
+
+        # Optimistic update: reflect immediately, real state syncs via the
+        # dispatcher signal once update_wireguard_client_state completes.
+        self._attr_is_on = True
+        self.async_write_ha_state()
+        await self._router.update_wireguard_client_state()
 
     async def async_turn_off(self, **_: Any) -> None:
-        """Disconnect any active VPN clients."""
+        """Disconnect any active VPN clients (also flips individual WG switches)."""
         active = list(self._router.wireguard_connections or [])
         if not active:
             self._attr_is_on = False
@@ -372,7 +408,6 @@ class VpnToggleSwitch(GliSwitchBase):
         self._attr_is_on = False
         self.async_write_ha_state()
         await self._router.update_wireguard_client_state()
-        await self.async_update()
 
     @callback
     async def async_update(self) -> None:
