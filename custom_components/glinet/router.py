@@ -467,7 +467,7 @@ class GLinetRouter:
         response = await self._update_platform(self._api.wireguard_client_state)
         if not response:
             return
-        _LOGGER.warning("vpn-client get_status raw response: %r", response)
+        _LOGGER.debug("vpn-client get_status raw response: %r", response)
         # Build name -> tunnel_id / peer_id map from the state response so we
         # can fill in tunnel_ids that the list call (wg-client.get_all_config_list)
         # did not return. On firmware >= 4.8 the int we pass to
@@ -493,7 +493,7 @@ class GLinetRouter:
                 continue
             new_tunnel_id = entry.get("tunnel_id")
             if new_tunnel_id is not None and client.tunnel_id != new_tunnel_id:
-                _LOGGER.warning(
+                _LOGGER.debug(
                     "Resolved tunnel_id for WG client name=%s peer_id=%s: %s",
                     client.name,
                     client.peer_id,

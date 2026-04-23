@@ -269,13 +269,13 @@ class WireGuardSwitch(GliSwitchBase):
     async def async_turn_on(self, **_: Any) -> None:
         """Turn on the service."""
         if self._client.tunnel_id is None:
-            _LOGGER.warning(
+            _LOGGER.debug(
                 "WG switch: tunnel_id unknown for %s, refreshing state first",
                 self._client.name,
             )
             await self._router.update_wireguard_client_state()
         peer_or_tunnel = self._client.tunnel_id or self._client.peer_id
-        _LOGGER.warning(
+        _LOGGER.debug(
             "WG switch turn_on name=%s group_id=%s peer_id=%s tunnel_id=%s (arg=%s)",
             self._client.name,
             self._client.group_id,
@@ -292,7 +292,7 @@ class WireGuardSwitch(GliSwitchBase):
                 and self._client not in self._router.connected_wireguard_clients
             ):
                 for client in self._router.connected_wireguard_clients:
-                    _LOGGER.warning(
+                    _LOGGER.debug(
                         "WG switch pre-stopping active client %s", client.name
                     )
                     await self._router.api.wireguard_client_stop(client.peer_id)
@@ -304,7 +304,7 @@ class WireGuardSwitch(GliSwitchBase):
         except (OSError, APIClientError, NonZeroResponse) as err:
             _LOGGER.exception("Unable to enable WG client: %s", err)
             return
-        _LOGGER.warning("wireguard_client_start returned: %r", result)
+        _LOGGER.debug("wireguard_client_start returned: %r", result)
         if (rpc_err := _rpc_failed(result)) is not None:
             _LOGGER.warning(
                 "Router rejected WG start for %s: %s. On firmware >= 4.8 "
@@ -432,7 +432,7 @@ class VpnToggleSwitch(GliSwitchBase):
             ],
             self._router.api.sid,
         )
-        _LOGGER.warning(
+        _LOGGER.debug(
             "VPN toggle: raw set_tunnel to switch peer name=%s peer_id=%s tunnel_id=%s",
             peer.name,
             peer.peer_id,
@@ -447,7 +447,7 @@ class VpnToggleSwitch(GliSwitchBase):
                 return await self._router.api._request(payload)  # noqa: SLF001
             except (OSError, aiohttp.ClientError) as err:
                 last_err = err
-                _LOGGER.warning(
+                _LOGGER.debug(
                     "set_tunnel attempt %d failed (%s); retrying",
                     attempt + 1,
                     err,
@@ -474,13 +474,13 @@ class VpnToggleSwitch(GliSwitchBase):
 
         tunnel_id = peer.tunnel_id or self._active_tunnel_id()
         if tunnel_id is None:
-            _LOGGER.warning(
+            _LOGGER.debug(
                 "VPN toggle: no tunnel_id known yet, refreshing router state"
             )
             await self._router.update_wireguard_client_state()
             tunnel_id = peer.tunnel_id or self._active_tunnel_id()
 
-        _LOGGER.warning(
+        _LOGGER.debug(
             "VPN toggle picked random peer=%s peer_id=%s group_id=%s tunnel_id=%s",
             peer.name,
             peer.peer_id,
@@ -491,9 +491,9 @@ class VpnToggleSwitch(GliSwitchBase):
         if tunnel_id is not None and peer.tunnel_id != tunnel_id:
             # Peer isn't the one in the slot → reassign via raw RPC.
             result = await self._assign_peer_and_start(peer, tunnel_id)
-            _LOGGER.warning("raw set_tunnel returned: %r", result)
+            _LOGGER.debug("raw set_tunnel returned: %r", result)
             if result is None or _rpc_failed(result) is not None:
-                _LOGGER.warning(
+                _LOGGER.debug(
                     "Peer switch RPC not accepted; falling back to enabling "
                     "whichever peer is currently in the tunnel slot"
                 )
@@ -515,7 +515,7 @@ class VpnToggleSwitch(GliSwitchBase):
 
         # Plain enable path (peer already assigned, or fallback).
         call_arg = peer.tunnel_id or peer.peer_id
-        _LOGGER.warning(
+        _LOGGER.debug(
             "VPN toggle starting peer=%s group_id=%s tunnel_id=%s (call arg=%s)",
             peer.name,
             peer.group_id,
@@ -531,7 +531,7 @@ class VpnToggleSwitch(GliSwitchBase):
                 "Unable to start VPN (peer %s): %s", peer.name, err
             )
             return
-        _LOGGER.warning("wireguard_client_start returned: %r", result)
+        _LOGGER.debug("wireguard_client_start returned: %r", result)
         if (rpc_err := _rpc_failed(result)) is not None:
             _LOGGER.warning(
                 "Router rejected VPN start for %s: %s", peer.name, rpc_err
@@ -551,7 +551,7 @@ class VpnToggleSwitch(GliSwitchBase):
 
         for client in active:
             peer_or_tunnel = client.tunnel_id or client.peer_id
-            _LOGGER.warning(
+            _LOGGER.debug(
                 "VPN toggle stopping WG client name=%s (arg=%s)",
                 client.name,
                 peer_or_tunnel,
@@ -563,7 +563,7 @@ class VpnToggleSwitch(GliSwitchBase):
                     "Unable to stop VPN (WG client %s): %s", client.name, err
                 )
                 continue
-            _LOGGER.warning("wireguard_client_stop returned: %r", result)
+            _LOGGER.debug("wireguard_client_stop returned: %r", result)
 
         self._attr_is_on = False
         self.async_write_ha_state()
