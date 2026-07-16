@@ -128,10 +128,14 @@ class GLinetRouter:
             await self._api.login(
                 self._entry.data[CONF_USERNAME], self._entry.data[CONF_PASSWORD]
             )
-        except OSError as exc:
-            _LOGGER.exception(
-                "Error connecting to GL-iNet router %s",
+        except (OSError, aiohttp.ClientError, TimeoutError) as exc:
+            # Router unreachable (offline, on the other side of a VPN, etc.).
+            # HA will retry via ConfigEntryNotReady — log compactly without a
+            # traceback so restarts don't flood the log with identical stacks.
+            _LOGGER.warning(
+                "Error connecting to GL-iNet router %s: %s",
                 self._host,
+                exc,
             )
             raise ConfigEntryNotReady from exc
         try:
